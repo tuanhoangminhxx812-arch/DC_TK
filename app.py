@@ -247,12 +247,18 @@ def format_number(val):
         return str(val)
 
 
+import zipfile
+
 def parse_excel_file(uploaded_file):
     """Parse the uploaded Excel file and extract data rows.
     Supports both old format (GL_016) and new format (0903).
     Automatically searches all sheets to find the proper data table.
     """
-    wb = openpyxl.load_workbook(uploaded_file, data_only=True)
+    try:
+        wb = openpyxl.load_workbook(uploaded_file, data_only=True)
+    except zipfile.BadZipFile:
+        st.error("⚠️ **Lỗi định dạng file:** File bạn tải lên không đúng chuẩn `.xlsx` (Đây có thể là file `.xls` định dạng cũ hoặc file bị lỗi/hỏng). \n\n👉 **Cách khắc phục:** Vui lòng mở file bằng phần mềm Excel trên máy tính, chọn **Save As (Lưu dưới dạng)** và chọn định dạng **Excel Workbook (*.xlsx)**, sau đó thử tải lên lại file mới.")
+        return None, None, None, None
     
     ws = None
     is_new_format = False
@@ -357,7 +363,30 @@ def parse_excel_file(uploaded_file):
                 'Người tạo': str(vals[7]).strip() if vals[7] else '',
             })
 
+def parse_numeric(val):
+    if pd.isna(val) or val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip()
+    if not s or s == '-':
+        return 0.0
+    s = s.replace(' ', '')
+    last_dot = s.rfind('.')
+    last_comma = s.rfind(',')
+    if last_comma > last_dot:
+        s = s.replace('.', '').replace(',', '.')
+    else:
+        s = s.replace(',', '')
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
     df = pd.DataFrame(data_rows)
+    if not df.empty:
+        df['Nợ nguyên tệ'] = df['Nợ nguyên tệ'].apply(parse_numeric)
+        df['Có nguyên tệ'] = df['Có nguyên tệ'].apply(parse_numeric)
 
     # ── Get totals from the file ──
     total_vals = None
@@ -366,15 +395,16 @@ def parse_excel_file(uploaded_file):
         row_text = ' '.join([str(v).lower().strip() for v in vals[:10] if v is not None])
         if 'tổng cộng' in row_text or 'cộng phát sinh' in row_text:
             vals.extend([None] * (25 - len(vals)))
+            
             if is_new_format:
                 total_vals = {
-                    'Tổng Nợ (file)': vals[13] if vals[13] else 0,
-                    'Tổng Có (file)': vals[14] if vals[14] else 0,
+                    'Tổng Nợ (file)': parse_numeric(vals[13]),
+                    'Tổng Có (file)': parse_numeric(vals[14]),
                 }
             else:
                 total_vals = {
-                    'Tổng Nợ (file)': vals[5] if vals[5] else 0,
-                    'Tổng Có (file)': vals[6] if vals[6] else 0,
+                    'Tổng Nợ (file)': parse_numeric(vals[5]),
+                    'Tổng Có (file)': parse_numeric(vals[6]),
                 }
             break
 
