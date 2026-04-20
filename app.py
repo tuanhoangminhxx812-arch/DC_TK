@@ -249,6 +249,27 @@ def format_number(val):
 
 import zipfile
 
+def parse_numeric(val):
+    if pd.isna(val) or val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip()
+    if not s or s == '-':
+        return 0.0
+    s = s.replace(' ', '')
+    last_dot = s.rfind('.')
+    last_comma = s.rfind(',')
+    if last_comma > last_dot:
+        s = s.replace('.', '').replace(',', '.')
+    else:
+        s = s.replace(',', '')
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
 def parse_excel_file(uploaded_file):
     """Parse the uploaded Excel file and extract data rows.
     Supports both old format (GL_016) and new format (0903).
@@ -363,25 +384,8 @@ def parse_excel_file(uploaded_file):
                 'Người tạo': str(vals[7]).strip() if vals[7] else '',
             })
 
-def parse_numeric(val):
-    if pd.isna(val) or val is None:
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    s = str(val).strip()
-    if not s or s == '-':
-        return 0.0
-    s = s.replace(' ', '')
-    last_dot = s.rfind('.')
-    last_comma = s.rfind(',')
-    if last_comma > last_dot:
-        s = s.replace('.', '').replace(',', '.')
-    else:
-        s = s.replace(',', '')
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+        # (End loop)
+        pass
 
     df = pd.DataFrame(data_rows)
     if not df.empty:
